@@ -15,20 +15,19 @@ LOCAL_LOG = "/var/log/ssh_monitor.log"     # log global
 # Mail settings
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SMTP_USER = "leoncerado@gmail.com"
-SMTP_PASS = "wzaa iuwh jfey uihl"
-MAIL_TO = "leoncerado@gmail.com"
+SMTP_USER = ""
+SMTP_PASS = ""
+MAIL_TO = ""
 
 # Slack webhook
-SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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"
-
+SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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"
+#SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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"
 # Regex pour SSH
 success_pattern = re.compile(r"Accepted .* for (\w+) from ([\d.]+)")
 fail_pattern = re.compile(r"Failed password for (invalid user )?(\w+) from ([\d.]+)")
 
-# Regex pour commandes loggées (voir profile.d/cmdlog.sh)
-cmd_pattern = re.compile(r"SSH user=(\w+) ip=([\d.]+) tty=(\S+) cmd=(.*) rc=(-?\d+)")
-
+# Regex pour commandes loggÃ©es (voir profile.d/cmdlog.sh)
+cmd_pattern = re.compile(r"SSH user=(\w+) ip=([\d.]+) server_ip=([\d.]+) tty=(\S+) cmd=(.*) rc=(-?\d+)")
 # === Fonctions ===
 
 def send_mail(subject, body):
@@ -40,7 +39,7 @@ def send_mail(subject, body):
 
         server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
         server.starttls()
-        server.login(SMTP_USER, SMTP_PASS)
+        server.login(SMTP_USER, SMTP_PsASS)
         server.sendmail(SMTP_USER, [MAIL_TO], msg.as_string())
         server.quit()
     except Exception as e:
@@ -62,7 +61,7 @@ def notify(event_type, message):
     print(msg)
     log_local(msg)
     send_slack(msg)
-    send_mail(f"SSH Monitor: {event_type}", message)  # Correction ici
+    #send_mail(f"SSH Monitor: {event_type}", message)  # Correction ici
 
 # === Threads de surveillance ===
 def monitor_auth():
@@ -78,15 +77,15 @@ def monitor_auth():
             success = success_pattern.search(line)
             if success:
                 user, ip = success.groups()
-                notify("Connexion SSH réussie", f"user={user} ip={ip}")
+                notify("Connexion SSH rÃ©ussie", f"user={user} client_ip={ip}  ")
 
             fail = fail_pattern.search(line)
             if fail:
                 _, user, ip = fail.groups()
-                notify("Connexion SSH échouée", f"user={user} ip={ip}")
+                notify("Connexion SSH Ã©chouÃ©e", f"user={user} ip={ip}")
 
 def monitor_commands():
-    """Surveille les commandes tapées avec IP"""
+    """Surveille les commandes tapÃ©es avec IP"""
    
     with open(LOG_COMMANDS, "r") as f:
         f.seek(0, 2)
@@ -98,10 +97,14 @@ def monitor_commands():
             print(f"[DEBUG]  Lignelue: {line.strip()}")
             m = cmd_pattern.search(line)
             if m:
-                user, ip, tty, cmd, rc = m.groups()
-                notify("Commande exécutée", f"user={user} ip={ip} tty={tty} cmd=\"{cmd}\" rc={rc}")
+                user, ip, server_ip, tty, cmd, rc = m.groups()
+                notify(
+                    "Commande exÃ©cutÃ©e",
+                    f"\n| Utilisateur\t| IP_client\t  | IP_serveur_cible\t|  Terminal type\t\t| rc\t| cmd\n"
+                    f"| {user}\t| {ip}\t| {server_ip}\t\t| {tty}\t  | {rc}\t|  \"{cmd}\""
+                )
             else:
-                notify("Commande non parsée", f"Erreu du commande")
+                notify("Commande non parsÃ©e", f"Erreur du commande")
 
 # === Lancer ===
 if __name__ == "__main__":
